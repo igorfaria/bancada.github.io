@@ -1,0 +1,40 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Bancada",
+      "hasCanvas": false,
+      "bodyTextLen": 3038,
+      "bodyTextHash": "7b5ea632b99668e851c2d23a9f037097c944ef2a37f4ede3772df43be6c4b833",
+      "bodyTextPrefix": "Bancada Componentes discretos Inventário Calcular Categorias Exp",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Bancada",
+      "hasCanvas": false,
+      "bodyTextLen": 3020,
+      "bodyTextHash": "d570cea1e79c7068691a82862bb7705593b5376e5a81be9aac9d8de9e0538019",
+      "bodyTextPrefix": "Bancada Componentes discretos Nova peça Todas R Resistores C Cap",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [
+    "BRAND NOTE: no custom public/og.jpg — the platform will serve the og.grok.me placeholder. Custom cards are the default for games of every kind (DOM board/word games included), whimsical apps, creative tools, and brand-forward pages — only plain utilities (converters, CRUD trackers, admin dashboards) keep the placeholder. If this app is not a plain utility, finish the brand-asset pass per /workspace/.grok/skills/og/SKILL.md."
+  ],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}

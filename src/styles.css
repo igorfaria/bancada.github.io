@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-bg: #f3f1ec;
+  --color-surface: #fffcf8;
+  --color-elevated: #ffffff;
+  --color-ink: #1c1b18;
+  --color-muted: #6f6a62;
+  --color-subtle: #8e897f;
+  --color-line: #e3dfd6;
+  --color-line-strong: #d0cbc0;
+  --color-accent: #1e4d5c;
+  --color-accent-fg: #f3f6f7;
+  --color-danger: #8d3b35;
+  --color-danger-bg: #f4e7e5;
+
+  --radius-sm: 0.5rem;
+  --radius-xl: 1.5rem;
+
+  --shadow-panel: 0 1px 2px rgb(28 27 24 / 0.05);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent) 22%, white);
+  }
+}
+
+@layer components {
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+
+  .resistor-body {
+    background: #e4d3b4;
+    border: 1px solid #c3b08e;
+  }
+
+  .band {
+    width: 0.5rem;
+    height: 1.75rem;
+    border-radius: 1px;
+  }
+
+  .band-black { background: #1a1916; }
+  .band-brown { background: #6b4423; }
+  .band-red { background: #a33b32; }
+  .band-orange { background: #d06a2b; }
+  .band-yellow { background: #e2c04a; }
+  .band-green { background: #3e7a45; }
+  .band-blue { background: #2f5f98; }
+  .band-violet { background: #6a4c93; }
+  .band-gray { background: #8d8a84; }
+  .band-white {
+    background: #f7f4ee;
+    box-shadow: inset 0 0 0 1px #d0cbc0;
+  }
+  .band-gold { background: #c6a15b; }
+  .band-silver { background: #c5c7cc; }
+
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .press:active {
+    transform: scale(0.98);
+  }
+
+  .drawer-panel {
+    animation: drawer-in 250ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .overlay-in {
+    animation: fade-in 200ms ease;
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-panel,
+  .overlay-in,
+  .press:active {
+    animation: none;
+    transform: none;
+  }
+}
