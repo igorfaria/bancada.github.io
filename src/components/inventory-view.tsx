@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Minus, Plus, Search } from "lucide-react";
 import { isLow, matchesQuery, partHeadline } from "@/lib/parts";
-import { parseEngineering } from "@/lib/si";
+import { compareByValue, compareLocationLabels, type SortDir } from "@/lib/sort-parts";
 import { useBench } from "@/lib/store";
 import type { Part } from "@/lib/types";
 import { Badge, Button, Input } from "@/components/ui";
@@ -22,6 +22,16 @@ export function InventoryView({
   const parts = useBench((state) => state.parts);
   const adjustQty = useBench((state) => state.adjustQty);
   const [query, setQuery] = useState("");
+  const [sortKey, setSortKey] = useState<"value" | "location">("value");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function toggleSort(key: "value" | "location") {
+    if (sortKey === key) setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const units = parts.reduce((sum, part) => sum + part.qty, 0);
   const lowCount = parts.filter(isLow).length;
@@ -35,6 +45,28 @@ export function InventoryView({
   }, [parts, categories, filter, query]);
 
   const groups = useMemo(() => {
+    if (sortKey === "location") {
+      const buckets = new Map<string, Part[]>();
+      for (const part of visible) {
+        const key = part.location.trim();
+        const list = buckets.get(key) ?? [];
+        list.push(part);
+        buckets.set(key, list);
+      }
+      return [...buckets.entries()]
+        .sort((a, b) => {
+          if (!a[0] && b[0]) return 1;
+          if (a[0] && !b[0]) return -1;
+          const cmp = compareLocationLabels(a[0], b[0]);
+          return sortDir === "asc" ? cmp : -cmp;
+        })
+        .map(([location, items]) => ({
+          id: location || "none",
+          name: location || "Sem gaveta",
+          items: [...items].sort((a, b) => compareByValue(a, b, categories, sortDir)),
+        }));
+    }
+
     const order = categories.map((category) => category.id);
     const buckets = new Map<string, Part[]>();
     for (const part of visible) {
@@ -51,16 +83,9 @@ export function InventoryView({
       .map(([id, items]) => ({
         id,
         name: categories.find((category) => category.id === id)?.name ?? "Sem categoria",
-        items: items.sort((a, b) => {
-          const cat = categories.find((c) => c.id === id);
-          const field = cat?.fields.find((item) => item.kind === "si");
-          const av = field ? parseEngineering(a.props[field.key] || "") : null;
-          const bv = field ? parseEngineering(b.props[field.key] || "") : null;
-          if (av != null && bv != null && av !== bv) return av - bv;
-          return partHeadline(a, cat).title.localeCompare(partHeadline(b, cat).title, "pt");
-        }),
+        items: [...items].sort((a, b) => compareByValue(a, b, categories, sortDir)),
       }));
-  }, [visible, categories]);
+  }, [visible, categories, sortKey, sortDir]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -93,6 +118,21 @@ export function InventoryView({
         <FilterChip active={filter === "low"} onClick={() => setFilter(filter === "low" ? "all" : "low")}>
           Stock baixo
         </FilterChip>
+      </div>
+
+      <div className="flex gap-2">
+        <SortChip
+          label="Valor"
+          active={sortKey === "value"}
+          dir={sortDir}
+          onClick={() => toggleSort("value")}
+        />
+        <SortChip
+          label="Local"
+          active={sortKey === "location"}
+          dir={sortDir}
+          onClick={() => toggleSort("location")}
+        />
       </div>
 
       <div className="grid grid-cols-3 gap-2">
@@ -179,6 +219,25 @@ export function InventoryView({
         ))
       )}
     </div>
+  );
+}
+
+function SortChip({ label, active, dir, onClick }: { label: string; active: boolean; dir: SortDir; onClick: () => void }) {
+  const direction = !active ? "ordenar" : dir === "asc" ? "crescente, clicar inverte" : "decrescente, clicar inverte";
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      aria-label={`${label}, ${direction}`}
+      onClick={onClick}
+      className={cn(
+        "press h-11 rounded-full border px-4 text-sm font-medium",
+        active ? "border-accent bg-accent text-accent-fg" : "border-line-strong bg-surface text-ink",
+      )}
+    >
+      {label}
+      {active ? (dir === "asc" ? " ↑" : " ↓") : ""}
+    </button>
   );
 }
 

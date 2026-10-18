@@ -19,10 +19,13 @@ import {
   type BjtPolarity,
 } from "@/lib/calc";
 import { formatSi, formatNum, parseEngineering } from "@/lib/si";
-import { formatProp, matchStock, partHeadline, powerOf } from "@/lib/parts";
+import { formatProp, powerOf } from "@/lib/parts";
+import { suggestWattage } from "@/lib/propose";
 import { useBench } from "@/lib/store";
 import type { Part } from "@/lib/types";
 import { Button, Field, Input, Select } from "@/components/ui";
+import { DividerPlan, StockPlan } from "@/components/stock-plan";
+import { blankPart, PartDrawer } from "@/components/part-drawer";
 import { cn } from "@/lib/utils";
 
 const TOOLS = [
@@ -182,44 +185,29 @@ function StockHits({
   target,
   unit,
   dissipated,
+  onUse,
+  title,
 }: {
   categoryId: string;
   fieldKey: string;
   target: number;
   unit: string;
   dissipated?: number;
+  onUse?: (value: string) => void;
+  title?: string;
 }) {
-  const parts = useBench((state) => state.parts);
-  const categories = useBench((state) => state.categories);
-  const category = categories.find((item) => item.id === categoryId);
-  const { close, nearest } = matchStock(parts, categoryId, fieldKey, target);
-  const rows = close.length > 0 ? close.slice(0, 4) : nearest ? [nearest] : [];
+  const kind = fieldKey === "capacitance" ? "C" : fieldKey === "inductance" ? "L" : "R";
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">{close.length > 0 ? "No stock, dentro de 10%" : "A mais próxima no stock"}</p>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted">Ainda não há peças desta categoria com quantidade.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {rows.map((row) => {
-            const rating = powerOf(row.part);
-            const over = dissipated != null && rating != null && dissipated > rating;
-            return (
-              <li key={row.part.id} className="rounded-lg border border-line bg-bg px-3 py-3 text-sm">
-                <span className="num">{formatSi(row.value, unit)}</span>
-                <span className="text-muted">
-                  {" "}
-                  · {formatNum(row.errPct, 2)}% · {row.part.qty} un.
-                  {row.part.location ? ` · ${row.part.location}` : ""}
-                </span>
-                <span className="mt-1 block text-muted">{partHeadline(row.part, category).meta}</span>
-                {over ? <span className="mt-1 block text-danger">A potência desta peça não chega.</span> : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
+    <StockPlan
+      categoryId={categoryId}
+      fieldKey={fieldKey}
+      kind={kind}
+      target={target}
+      unit={unit}
+      dissipated={dissipated}
+      onUse={onUse}
+      title={title}
+    />
   );
 }
 
@@ -261,6 +249,7 @@ function OhmPanel() {
             <Metric label="Potência" value={formatSi(result.power, "W")} />
           </div>
           <PowerNote dissipated={result.power} part={rPart} />
+          <AddResistorStock ohms={result.resistance} power={result.power} notes="Valor saído da lei de Ohm." />
           <StockHits categoryId="resistors" fieldKey="resistance" target={result.resistance} unit="Ω" dissipated={result.power} />
         </>
       ) : (
@@ -318,6 +307,30 @@ function DividerPanel() {
           </div>
           <PowerNote dissipated={result.p1} part={p1} />
           <PowerNote dissipated={result.p2} part={p2} />
+          <StockHits
+            categoryId="resistors"
+            fieldKey="resistance"
+            target={R1!}
+            unit="Ω"
+            dissipated={result.p1}
+            onUse={(value) => {
+              setR1(value);
+              setP1(null);
+            }}
+            title="R1 com o stock"
+          />
+          <StockHits
+            categoryId="resistors"
+            fieldKey="resistance"
+            target={R2!}
+            unit="Ω"
+            dissipated={result.p2}
+            onUse={(value) => {
+              setR2(value);
+              setP2(null);
+            }}
+            title="R2 com o stock"
+          />
         </>
       ) : (
         <p className="text-sm text-danger">{result.error}</p>
@@ -366,6 +379,12 @@ function RcPanel() {
       ) : (
         <p className="text-sm text-danger">{result.error}</p>
       )}
+      {result?.ok && R != null ? (
+        <StockHits categoryId="resistors" fieldKey="resistance" target={R} unit="Ω" onUse={setR} title="Resistência com o stock" />
+      ) : null}
+      {result?.ok && C != null ? (
+        <StockHits categoryId="capacitors" fieldKey="capacitance" target={C} unit="F" onUse={setC} title="Capacitor com o stock" />
+      ) : null}
     </Panel>
   );
 }
@@ -401,6 +420,12 @@ function LcPanel() {
       ) : (
         <p className="text-sm text-danger">{result.error}</p>
       )}
+      {result?.ok && L != null ? (
+        <StockHits categoryId="inductors" fieldKey="inductance" target={L} unit="H" onUse={setL} title="Indutor com o stock" />
+      ) : null}
+      {result?.ok && C != null ? (
+        <StockHits categoryId="capacitors" fieldKey="capacitance" target={C} unit="F" onUse={setC} title="Capacitor com o stock" />
+      ) : null}
     </Panel>
   );
 }
@@ -438,7 +463,8 @@ function LedPanel() {
             <Metric label="No LED" value={formatSi(result.pLed, "W")} />
             <Metric label="E12 / E24" value={e12 != null && e24 != null ? `${formatSi(e12, "Ω")}` : "—"} detail={e24 != null ? `E24 ${formatSi(e24, "Ω")}` : undefined} />
           </div>
-          <StockHits categoryId="resistors" fieldKey="resistance" target={e12 ?? result.resistance} unit="Ω" dissipated={result.pRes} />
+          <AddResistorStock ohms={e24 ?? result.resistance} power={result.pRes} notes={`Conta do LED: ${formatSi(result.resistance, "Ω")}.`} />
+          <StockHits categoryId="resistors" fieldKey="resistance" target={result.resistance} unit="Ω" dissipated={result.pRes} />
         </>
       ) : (
         <p className="text-sm text-danger">{result.error}</p>
@@ -648,6 +674,20 @@ function TransistorPanel() {
               Vb {formatSi(result.vb, "V")} · Ve {formatSi(result.ve, "V")} · Vc {formatSi(result.vc, "V")}
             </p>
           ) : null}
+          {mode === "bias" && Vcc != null && Vbe != null && Beta != null && K != null ? (
+            <DividerPlan
+              polarity={polarity}
+              vcc={Vcc}
+              vbe={Vbe}
+              beta={Beta}
+              re={result.resistors.find((item) => item.name === "Re")!.ohms}
+              rc={result.resistors.find((item) => item.name === "Rc")!.ohms}
+              r1={result.resistors.find((item) => item.name === "R1")!.ohms}
+              r2={result.resistors.find((item) => item.name === "R2")!.ohms}
+              targetIc={result.ic}
+              minStiffness={K}
+            />
+          ) : null}
           <ul className="flex flex-col gap-1">
             {result.notes.map((note) => (
               <li key={note} className="text-sm text-muted">
@@ -686,25 +726,13 @@ function ResistorCard({ item }: { item: BiasResistor }) {
         E12 {formatSi(e12, "Ω")} · E24 {formatSi(e24, "Ω")} · {formatSi(item.power, "W")}
       </p>
       {hot ? <p className="mt-1 text-sm text-danger">{item.power > 0.5 ? "Precisa de 1 W ou mais." : "Acima de ¼ W: usa ½ W."}</p> : null}
-      <NearestResistor target={e12} power={item.power} />
+      <div className="mt-3">
+        <StockHits categoryId="resistors" fieldKey="resistance" target={item.ohms} unit="Ω" dissipated={item.power} title={`${item.name} com o stock`} />
+      </div>
+      <div className="mt-3">
+        <AddResistorStock ohms={e24} power={item.power} notes={`${item.name}, conta ${formatSi(item.ohms, "Ω")}.`} />
+      </div>
     </div>
-  );
-}
-
-function NearestResistor({ target, power }: { target: number; power: number }) {
-  const parts = useBench((state) => state.parts);
-  const categories = useBench((state) => state.categories);
-  const category = categories.find((item) => item.id === "resistors");
-  const { close, nearest } = matchStock(parts, "resistors", "resistance", target);
-  const row = close[0] ?? nearest;
-  if (!row || row.errPct > 25) return <p className="mt-2 text-sm text-muted">Nada no stock a menos de 25%.</p>;
-  const rating = powerOf(row.part);
-  const over = rating != null && power > rating;
-  return (
-    <p className={cn("mt-2 text-sm", over ? "text-danger" : "text-muted")}>
-      Stock {formatSi(row.value, "Ω")} · {formatNum(row.errPct, 1)}% · {partHeadline(row.part, category).meta}
-      {over ? " — a potência não chega." : ""}
-    </p>
   );
 }
 
@@ -940,6 +968,8 @@ function NetPanel() {
         <>
           <p className="text-sm text-muted">{result.formula}</p>
           <Metric label="Equivalente" value={formatSi(result.value, unit)} />
+          {kind === "R" ? <AddResistorStock ohms={result.value} notes="Equivalente série ou paralelo." /> : null}
+          <StockHits categoryId={stock.categoryId} fieldKey={stock.fieldKey} target={result.value} unit={unit} />
         </>
       ) : (
         <p className="text-sm text-muted">{result.error}</p>
@@ -1109,6 +1139,7 @@ function BandsPanel() {
           />
           {tolValue === "20" ? <p className="text-sm text-muted">20% muitas vezes não leva banda de tolerância.</p> : null}
           <p className="text-sm text-muted">{shown.map((id) => bandById(id)?.name ?? id).join(" · ")}</p>
+          <AddResistorStock ohms={writeOhms} tolerance={Number(tolValue)} bands={shown} />
           <StockHits categoryId="resistors" fieldKey="resistance" target={writeOhms} unit="Ω" />
         </>
       ) : null}
@@ -1120,10 +1151,59 @@ function BandsPanel() {
             detail={decoded.tolerance != null ? `± ${String(decoded.tolerance).replace(".", ",")} %` : "Sem banda de tolerância"}
           />
           <p className="text-sm text-muted">{shown.map((id) => bandById(id)?.name ?? id).join(" · ")}</p>
+          <AddResistorStock ohms={decoded.ohms} tolerance={decoded.tolerance} bands={shown} />
           {target != null ? <StockHits categoryId="resistors" fieldKey="resistance" target={target} unit="Ω" /> : null}
         </>
       ) : null}
       {mode === "read" && decoded && !decoded.ok ? <p className="text-sm text-danger">{decoded.error}</p> : null}
     </Panel>
+  );
+}
+
+function AddResistorStock({
+  ohms,
+  tolerance,
+  power,
+  notes,
+  bands,
+}: {
+  ohms: number;
+  tolerance?: number | null;
+  power?: number;
+  notes?: string;
+  bands?: string[];
+}) {
+  const [draft, setDraft] = useState<Part | null>(null);
+  const [saved, setSaved] = useState(false);
+  const label = formatSi(ohms, "Ω");
+  const wattage = suggestWattage(power);
+
+  function open() {
+    const part = blankPart("resistors");
+    const bandNote = bands?.length ? `Código de cores: ${bands.map((id) => bandById(id)?.name ?? id).join(" · ")}` : "";
+    part.props = {
+      resistance: String(ohms),
+      ...(wattage ? { power: wattage } : {}),
+      ...(tolerance != null ? { tolerance: String(tolerance) } : {}),
+    };
+    part.notes = [notes, bandNote].filter(Boolean).join(" ");
+    part.qty = 1;
+    setDraft(part);
+    setSaved(false);
+  }
+
+  function close(saved?: boolean) {
+    if (saved) setSaved(true);
+    setDraft(null);
+  }
+
+  return (
+    <>
+      <Button variant="secondary" onClick={open}>
+        Adicionar {label} ao stock
+      </Button>
+      {saved ? <p className="text-sm text-muted">{label} entrou no inventário.</p> : null}
+      {draft ? <PartDrawer key={draft.id} initial={draft} mode="new" onClose={close} /> : null}
+    </>
   );
 }

@@ -53,7 +53,25 @@ function fromInput(value: string, field: FieldDef): string {
   return trimmed;
 }
 
-export function PartDrawer({ initial, mode, onClose }: { initial: Part; mode: "new" | "edit"; onClose: () => void }) {
+function sameStockLine(existing: Part, next: Part): boolean {
+  if (existing.categoryId !== next.categoryId) return false;
+  if (existing.location.trim() !== next.location.trim()) return false;
+  if ((existing.props.package || "") !== (next.props.package || "")) return false;
+  if ((existing.props.tolerance || "") !== (next.props.tolerance || "")) return false;
+  const category = useBench.getState().categories.find((item) => item.id === next.categoryId);
+  const field = category?.fields.find((item) => item.kind === "si");
+  if (!field) return false;
+  const left = parseEngineering(existing.props[field.key] || "");
+  const right = parseEngineering(next.props[field.key] || "");
+  if (left == null || right == null || left === 0) return false;
+  if (Math.abs(left - right) / Math.abs(left) > 0.01) return false;
+  const leftPower = parseEngineering(existing.props.power || "");
+  const rightPower = parseEngineering(next.props.power || "");
+  if (leftPower != null && rightPower != null && Math.abs(leftPower - rightPower) / leftPower > 0.05) return false;
+  return true;
+}
+
+export function PartDrawer({ initial, mode, onClose }: { initial: Part; mode: "new" | "edit"; onClose: (saved?: boolean) => void }) {
   const categories = useBench((state) => state.categories);
   const parts = useBench((state) => state.parts);
   const addPart = useBench((state) => state.addPart);
@@ -110,16 +128,19 @@ export function PartDrawer({ initial, mode, onClose }: { initial: Part; mode: "n
       props,
       updatedAt: Date.now(),
     };
-    if (mode === "new") addPart(next);
-    else updatePart(next);
-    onClose();
+    if (mode === "new") {
+      const existing = parts.find((item) => sameStockLine(item, next));
+      if (existing) updatePart({ ...existing, qty: existing.qty + qty, updatedAt: Date.now() });
+      else addPart(next);
+    } else updatePart(next);
+    onClose(true);
   }
 
   return (
     <Drawer
       title={mode === "new" ? "Nova peça" : "Editar peça"}
       description="Valores como 4k7, 100n, 10µ ou 250m."
-      onClose={onClose}
+      onClose={() => onClose()}
       footer={
         confirmDelete ? (
           <>
@@ -146,7 +167,7 @@ export function PartDrawer({ initial, mode, onClose }: { initial: Part; mode: "n
             ) : (
               <span />
             )}
-            <Button variant="secondary" className="ml-auto" onClick={onClose}>
+            <Button variant="secondary" className="ml-auto" onClick={() => onClose()}>
               Cancelar
             </Button>
             <Button onClick={save}>Guardar</Button>
